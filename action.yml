@@ -1,0 +1,38 @@
+name: "simple-review-bot"
+description: "AI Code Review with multiple perspectives, voting, and cross-review debate"
+author: "minjihan"
+
+branding:
+  icon: "eye"
+  color: "blue"
+
+inputs:
+  provider:
+    description: "LLM provider (openai, claude, gemini)"
+    required: false
+    default: "openai"
+  openai_api_key:
+    description: "OpenAI API key"
+    required: false
+  claude_api_key:
+    description: "Anthropic API key"
+    required: false
+  gemini_api_key:
+    description: "Google Gemini API key"
+    required: false
+  config_path:
+    description: "Path to config file"
+    required: false
+    default: ".github/pr-lens.yml"
+  debate_enabled:
+    description: "Enable cross-review debate (true/false)"
+    required: false
+    default: "false"
+  labels_enabled:
+    description: "Enable automatic label application (true/false)"
+    required: false
+    default: "false"
+
+runs:
+  using: "node20"
+  main: "dist/index.js"

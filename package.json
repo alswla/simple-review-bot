@@ -1,0 +1,35 @@
+{
+  "name": "simple-review-bot",
+  "version": "1.0.0",
+  "description": "AI Code Review with multiple perspectives",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "github-action",
+    "code-review",
+    "ai",
+    "llm"
+  ],
+  "author": "minjihan",
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^1.10.1",
+    "@actions/github": "^6.0.0",
+    "@anthropic-ai/sdk": "^0.24.0",
+    "@google/genai": "^1.0.0",
+    "openai": "^4.56.0",
+    "js-yaml": "^4.1.0",
+    "minimatch": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.14.0",
+    "@vercel/ncc": "^0.38.0",
+    "typescript": "^5.4.0"
+  }
+}
