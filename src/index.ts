@@ -1,4 +1,5 @@
 import * as core from "@actions/core";
+import * as github from "@actions/github";
 import { createProvider, selectModel, countChangedLines } from "./providers";
 import {
   SecurityAgent,
@@ -9,8 +10,9 @@ import {
 } from "./agents";
 import { GitHubClient } from "./github/client";
 import { filterDiff } from "./github/diff";
-import { formatComment } from "./github/comment";
+import { formatComment, buildInlineComments } from "./github/comment";
 import { loadConfig, normalizeAgentConfig } from "./utils/config";
+import { loadGuidelines, buildPrompt } from "./utils/guidelines";
 import { castVote, countVotes, AgentVote } from "./review/voter";
 import { determineWeights, getAgentWeight } from "./review/weigher";
 import { runDebate, EnrichedIssue } from "./review/debate";
@@ -22,7 +24,20 @@ async function run(): Promise<void> {
     const config = loadConfig();
     logger.info("Configuration loaded.");
 
-    // 2. Get inputs
+    // 2. Initialize GitHub client and check event type
+    const githubToken = process.env.GITHUB_TOKEN;
+    const ghClient = new GitHubClient(githubToken);
+
+    // Handle issue_comment event (re-review trigger)
+    if (github.context.eventName === "issue_comment") {
+      if (!ghClient.isReReviewTrigger()) {
+        logger.info("Comment does not contain /review. Skipping.");
+        return;
+      }
+      logger.info("🔄 Re-review triggered via /review comment.");
+    }
+
+    // 3. Get inputs
     const providerType =
       core.getInput("provider") || config.provider.type || "openai";
     const apiKey =
@@ -30,7 +45,6 @@ async function run(): Promise<void> {
       core.getInput("api_key") ||
       "";
 
-    // For Vertex AI, API key is not required
     const isVertexAI = config.provider.vertexai === true;
 
     if (!apiKey && !isVertexAI) {
@@ -39,7 +53,7 @@ async function run(): Promise<void> {
       );
     }
 
-    // 3. Initialize provider
+    // 4. Initialize provider
     const provider = createProvider({
       type: providerType as "openai" | "claude" | "gemini",
       apiKey,
@@ -53,19 +67,17 @@ async function run(): Promise<void> {
     });
     logger.info(`Provider initialized: ${provider.name}`);
 
-    // 4. Initialize GitHub client and get diff
-    const githubToken = process.env.GITHUB_TOKEN;
-    const github = new GitHubClient(githubToken);
-    const prNumber = github.getPRNumber();
+    // 5. Get PR diff
+    const prNumber = ghClient.getPRNumber();
     logger.info(`Reviewing PR #${prNumber}`);
 
-    const rawDiff = await github.getPRDiff(prNumber);
+    const rawDiff = await ghClient.getPRDiff(prNumber);
     if (!rawDiff || rawDiff.trim().length === 0) {
       logger.info("No diff found. Skipping review.");
       return;
     }
 
-    // 5. Filter diff based on ignore config
+    // 6. Filter diff based on ignore config
     const diff = filterDiff(
       rawDiff,
       config.ignore?.files,
@@ -77,7 +89,7 @@ async function run(): Promise<void> {
       return;
     }
 
-    // 6. Truncate diff if too large (LLM context limit)
+    // 7. Truncate diff if too large (LLM context limit)
     const MAX_DIFF_LENGTH = 100_000;
     const truncatedDiff =
       diff.length > MAX_DIFF_LENGTH
@@ -85,7 +97,7 @@ async function run(): Promise<void> {
           "\n\n... (diff truncated due to size)"
         : diff;
 
-    // 7. Tiered model selection (auto-select model based on diff size)
+    // 8. Tiered model selection
     let tieredModel: string | undefined;
     if (config.tiered_model?.enabled) {
       const changedLines = countChangedLines(rawDiff);
@@ -93,7 +105,7 @@ async function run(): Promise<void> {
       logger.info(`Tiered model: ${changedLines} lines → ${tieredModel}`);
     }
 
-    // 8. Determine agent weights based on file types
+    // 9. Determine agent weights based on file types
     const weights = determineWeights(
       rawDiff,
       config.weights?.auto_detect !== false
@@ -104,7 +116,7 @@ async function run(): Promise<void> {
       `Weights: Security=${weights.security} Performance=${weights.performance} Quality=${weights.quality} UX=${weights.ux}`,
     );
 
-    // 9. Initialize agents based on config (supports boolean and object formats)
+    // 10. Initialize agents with custom guidelines
     const allAgentEntries = [
       { key: "security", agent: new SecurityAgent() as Agent },
       { key: "performance", agent: new PerformanceAgent() as Agent },
@@ -114,11 +126,16 @@ async function run(): Promise<void> {
 
     const agentConfigs = config.agents || {};
     const agents: { agent: Agent; model?: string }[] = [];
+
     for (const { key, agent } of allAgentEntries) {
       const agentCfg = normalizeAgentConfig(
         agentConfigs[key as keyof typeof agentConfigs],
       );
       if (agentCfg.enabled) {
+        // Load and apply custom guidelines
+        const guidelines = loadGuidelines(key);
+        agent.systemPrompt = buildPrompt(agent.systemPrompt, guidelines);
+
         agents.push({ agent, model: agentCfg.model });
       }
     }
@@ -128,8 +145,7 @@ async function run(): Promise<void> {
       return;
     }
 
-    // 10. Run reviews in parallel (Round 1)
-    // Priority: per-agent model > tiered model > default model
+    // 11. Run reviews in parallel (Round 1)
     logger.info(`🔍 Running reviews with ${agents.length} agents...`);
     const reviews = await Promise.all(
       agents.map(({ agent, model: agentModel }) => {
@@ -141,7 +157,7 @@ async function run(): Promise<void> {
       }),
     );
 
-    // 11. Cast votes based on review results
+    // 12. Cast votes based on review results
     const votes: AgentVote[] = reviews.map((review) =>
       castVote(
         review.agent,
@@ -151,7 +167,7 @@ async function run(): Promise<void> {
       ),
     );
 
-    // 12. Run debate (Round 2 — cross-review) if enabled
+    // 13. Run debate (Round 2 — cross-review) if enabled
     let enrichedIssues: EnrichedIssue[] | undefined;
     const debateConfig = config.debate || {};
 
@@ -162,7 +178,7 @@ async function run(): Promise<void> {
       });
     }
 
-    // 13. Count votes with weighted scoring
+    // 14. Count votes with weighted scoring
     const votingSummary = countVotes(votes, {
       requiredApprovals: config.voting?.required_approvals ?? 2,
       conditionalWeight: config.voting?.conditional_weight ?? 0.5,
@@ -172,16 +188,34 @@ async function run(): Promise<void> {
       `Vote result: ${votingSummary.verdict} (${votingSummary.totalWeightedScore.toFixed(1)}/${votingSummary.maxPossibleScore.toFixed(1)})`,
     );
 
-    // 14. Format and post comment
+    // 15. Format and post dashboard comment
     const comment = formatComment(
       reviews,
       votes,
       votingSummary,
       enrichedIssues,
     );
-    await github.postComment(prNumber, comment);
+    await ghClient.postComment(prNumber, comment);
 
-    // 15. Apply label if enabled
+    // 16. Post inline review comments (high-confidence issues only)
+    const inlineComments = buildInlineComments(enrichedIssues, reviews);
+    if (inlineComments.length > 0) {
+      const reviewEvent =
+        votingSummary.verdict === "approved"
+          ? ("COMMENT" as const)
+          : votingSummary.verdict === "changes-requested"
+            ? ("REQUEST_CHANGES" as const)
+            : ("COMMENT" as const);
+
+      await ghClient.createInlineReview(
+        prNumber,
+        inlineComments,
+        `🔍 simple-review-bot found ${inlineComments.length} issue(s) requiring attention.`,
+        reviewEvent,
+      );
+    }
+
+    // 17. Apply label if enabled
     if (config.labels?.enabled) {
       const labelMap: Record<string, string> = {
         approved: config.labels.approved || "review:approved",
@@ -192,7 +226,7 @@ async function run(): Promise<void> {
       };
       const labelName = labelMap[votingSummary.verdict];
       if (labelName) {
-        await github.applyLabel(prNumber, labelName);
+        await ghClient.applyLabel(prNumber, labelName);
       }
     }
 
