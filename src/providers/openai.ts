@@ -14,16 +14,24 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   async chat(systemPrompt: string, userPrompt: string): Promise<string> {
+    return this.chatWithModel(systemPrompt, userPrompt, this.model);
+  }
+
+  async chatWithModel(
+    systemPrompt: string,
+    userPrompt: string,
+    model: string,
+  ): Promise<string> {
     return withRetry(async () => {
       try {
         const response = await this.client.chat.completions.create({
-          model: this.model,
+          model,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          temperature: 0.3,
-          max_tokens: 4096,
+          temperature: 0.2,
+          max_tokens: 8192,
         });
 
         const content = response.choices[0]?.message?.content;

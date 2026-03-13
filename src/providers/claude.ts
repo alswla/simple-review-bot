@@ -14,11 +14,19 @@ export class ClaudeProvider implements LLMProvider {
   }
 
   async chat(systemPrompt: string, userPrompt: string): Promise<string> {
+    return this.chatWithModel(systemPrompt, userPrompt, this.model);
+  }
+
+  async chatWithModel(
+    systemPrompt: string,
+    userPrompt: string,
+    model: string,
+  ): Promise<string> {
     return withRetry(async () => {
       try {
         const response = await this.client.messages.create({
-          model: this.model,
-          max_tokens: 4096,
+          model,
+          max_tokens: 8192,
           system: systemPrompt,
           messages: [{ role: "user", content: userPrompt }],
         });
