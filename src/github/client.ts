@@ -16,12 +16,31 @@ export class GitHubClient {
     this.context = github.context;
   }
 
+  /**
+   * Get PR number from either pull_request or issue_comment event.
+   */
   getPRNumber(): number {
-    const prNumber = this.context.payload.pull_request?.number;
-    if (!prNumber) {
-      throw new Error("This action must be triggered by a pull_request event.");
+    // pull_request event
+    if (this.context.payload.pull_request) {
+      return this.context.payload.pull_request.number;
     }
-    return prNumber;
+    // issue_comment event (re-review trigger via /review)
+    if (this.context.payload.issue?.pull_request) {
+      return this.context.payload.issue.number;
+    }
+    throw new Error(
+      "This action must be triggered by pull_request or issue_comment event.",
+    );
+  }
+
+  /**
+   * Check if this is a re-review trigger from a comment.
+   * Returns true if event is issue_comment AND body contains /review.
+   */
+  isReReviewTrigger(): boolean {
+    if (this.context.eventName !== "issue_comment") return false;
+    const body = this.context.payload.comment?.body || "";
+    return body.trim().startsWith("/review");
   }
 
   async getPRDiff(prNumber: number): Promise<string> {
@@ -70,6 +89,45 @@ export class GitHubClient {
         body,
       });
       core.info("Created new review comment.");
+    }
+  }
+
+  /**
+   * Create a GitHub Pull Request Review with inline comments on specific lines.
+   * Only posts comments for high-confidence issues (filtered by debate).
+   */
+  async createInlineReview(
+    prNumber: number,
+    comments: { path: string; line: number; body: string }[],
+    summary: string,
+    event: "APPROVE" | "REQUEST_CHANGES" | "COMMENT",
+  ): Promise<void> {
+    if (comments.length === 0) {
+      core.info("No inline comments to post.");
+      return;
+    }
+
+    const { owner, repo } = this.context.repo;
+
+    try {
+      await this.octokit.rest.pulls.createReview({
+        owner,
+        repo,
+        pull_number: prNumber,
+        body: summary,
+        event,
+        comments: comments.map((c) => ({
+          path: c.path,
+          line: c.line,
+          body: c.body,
+        })),
+      });
+      core.info(`Posted ${comments.length} inline review comment(s).`);
+    } catch (error) {
+      // If inline comments fail (e.g., line not in diff), fall back silently
+      core.warning(
+        `Failed to post some inline comments: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 

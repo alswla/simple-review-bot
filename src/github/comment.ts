@@ -1,4 +1,4 @@
-import { AgentReview } from "../agents/base";
+import { AgentReview, ReviewIssue } from "../agents/base";
 import {
   AgentVote,
   VotingSummary,
@@ -204,4 +204,62 @@ export function formatComment(
   );
 
   return lines.join("\n");
+}
+
+/**
+ * Build inline review comments from debate-filtered issues.
+ *
+ * Strategy:
+ * - With debate: only issues with confidence >= threshold get inline comments
+ * - Without debate: only critical + warning issues get inline comments
+ * - Only issues with valid file + line numbers are included
+ */
+export function buildInlineComments(
+  enrichedIssues: EnrichedIssue[] | undefined,
+  reviews: AgentReview[],
+  confidenceThreshold: number = 50,
+): { path: string; line: number; body: string }[] {
+  const comments: { path: string; line: number; body: string }[] = [];
+
+  if (enrichedIssues && enrichedIssues.length > 0) {
+    // Debate mode: use confidence-filtered enriched issues
+    for (const issue of enrichedIssues) {
+      if (!issue.file || !issue.line || issue.file === "unknown") continue;
+      if (issue.confidence < confidenceThreshold) continue;
+
+      const sevEmoji = SEVERITY_EMOJI[issue.severity] || "💡";
+      const badge = `${issue.confidence}% confidence`;
+      const body = [
+        `${sevEmoji} **${issue.severity.toUpperCase()}** — ${issue.issue}`,
+        "",
+        `> **Suggestion:** ${issue.suggestion}`,
+        "",
+        `_Found by ${issue.foundByEmoji} ${issue.foundBy} · ${badge}_`,
+      ].join("\n");
+
+      comments.push({ path: issue.file, line: issue.line, body });
+    }
+  } else {
+    // No debate: use raw review issues (critical + warning only)
+    for (const review of reviews) {
+      for (const issue of review.issues) {
+        if (!issue.file || !issue.line || issue.file === "unknown") continue;
+        if (issue.severity !== "critical" && issue.severity !== "warning")
+          continue;
+
+        const sevEmoji = SEVERITY_EMOJI[issue.severity] || "💡";
+        const body = [
+          `${sevEmoji} **${issue.severity.toUpperCase()}** — ${issue.issue}`,
+          "",
+          `> **Suggestion:** ${issue.suggestion}`,
+          "",
+          `_Found by ${review.emoji} ${review.agent}_`,
+        ].join("\n");
+
+        comments.push({ path: issue.file, line: issue.line, body });
+      }
+    }
+  }
+
+  return comments;
 }
