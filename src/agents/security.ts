@@ -1,5 +1,4 @@
-import { Agent, AgentReview, parseAgentResponse } from "./base";
-import { LLMProvider } from "../providers/base";
+import { BaseAgent } from "./base";
 import * as logger from "../utils/logger";
 
 const SYSTEM_PROMPT = `You are a Security Engineer reviewing code for vulnerabilities.
@@ -30,21 +29,17 @@ Respond ONLY in JSON format (no markdown, no code blocks):
 
 If there are no issues, return an empty issues array with a positive summary.`;
 
-export class SecurityAgent implements Agent {
+export class SecurityAgent extends BaseAgent {
   name = "Security";
   emoji = "🔒";
   systemPrompt = SYSTEM_PROMPT;
 
-  async review(diff: string, provider: LLMProvider): Promise<AgentReview> {
+  protected buildUserPrompt(diff: string): string {
     logger.agent(
       this.name,
       this.emoji,
       "Analyzing for security vulnerabilities...",
     );
-
-    const userPrompt = `Review the following code diff for security vulnerabilities:\n\n${diff}`;
-    const response = await provider.chat(this.systemPrompt, userPrompt);
-
-    return parseAgentResponse(response, this.name, this.emoji);
+    return `Review the following code diff for security vulnerabilities:\n\n${diff}`;
   }
 }

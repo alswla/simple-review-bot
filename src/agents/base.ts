@@ -22,6 +22,45 @@ export interface Agent {
   emoji: string;
   systemPrompt: string;
   review(diff: string, provider: LLMProvider): Promise<AgentReview>;
+  reviewWithModel(
+    diff: string,
+    provider: LLMProvider,
+    model: string,
+  ): Promise<AgentReview>;
+}
+
+/**
+ * Base class for agents. Provides default reviewWithModel implementation
+ * that delegates to provider.chatWithModel().
+ */
+export abstract class BaseAgent implements Agent {
+  abstract name: string;
+  abstract emoji: string;
+  abstract systemPrompt: string;
+
+  protected buildUserPrompt(diff: string): string {
+    return `Review the following code diff:\n\n${diff}`;
+  }
+
+  async review(diff: string, provider: LLMProvider): Promise<AgentReview> {
+    const userPrompt = this.buildUserPrompt(diff);
+    const response = await provider.chat(this.systemPrompt, userPrompt);
+    return parseAgentResponse(response, this.name, this.emoji);
+  }
+
+  async reviewWithModel(
+    diff: string,
+    provider: LLMProvider,
+    model: string,
+  ): Promise<AgentReview> {
+    const userPrompt = this.buildUserPrompt(diff);
+    const response = await provider.chatWithModel(
+      this.systemPrompt,
+      userPrompt,
+      model,
+    );
+    return parseAgentResponse(response, this.name, this.emoji);
+  }
 }
 
 export function parseAgentResponse(

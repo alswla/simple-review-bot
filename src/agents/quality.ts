@@ -1,5 +1,4 @@
-import { Agent, AgentReview, parseAgentResponse } from "./base";
-import { LLMProvider } from "../providers/base";
+import { BaseAgent } from "./base";
 import * as logger from "../utils/logger";
 
 const SYSTEM_PROMPT = `You are a Code Quality Engineer ensuring maintainability.
@@ -31,17 +30,13 @@ Respond ONLY in JSON format (no markdown, no code blocks):
 
 If there are no issues, return an empty issues array with a positive summary.`;
 
-export class QualityAgent implements Agent {
+export class QualityAgent extends BaseAgent {
   name = "Quality";
   emoji = "🧹";
   systemPrompt = SYSTEM_PROMPT;
 
-  async review(diff: string, provider: LLMProvider): Promise<AgentReview> {
+  protected buildUserPrompt(diff: string): string {
     logger.agent(this.name, this.emoji, "Analyzing for code quality...");
-
-    const userPrompt = `Review the following code diff for code quality:\n\n${diff}`;
-    const response = await provider.chat(this.systemPrompt, userPrompt);
-
-    return parseAgentResponse(response, this.name, this.emoji);
+    return `Review the following code diff for code quality:\n\n${diff}`;
   }
 }
