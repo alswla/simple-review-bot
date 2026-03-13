@@ -10,12 +10,10 @@
 
 ### 🤖 4개 에이전트
 
-| 에이전트       | 역할               | 주요 체크                             |
-| -------------- | ------------------ | ------------------------------------- |
-| 🔒 Security    | 보안 엔지니어      | 시크릿 노출, 인젝션, XSS, 인증 취약점 |
-| ⚡ Performance | 성능 엔지니어      | O(n²), N+1, 메모리 누수, 캐싱         |
-| 🧹 Quality     | 코드 품질 엔지니어 | 네이밍, DRY, 에러 핸들링, SOLID       |
-| 🎨 UX          | UX 엔지니어        | 로딩 상태, a11y, 빈 상태, 반응형      |
+- **🔒 Security** — 시크릿 노출, 인젝션, XSS, 인증 취약점
+- **⚡ Performance** — O(n²), N+1, 메모리 누수, 캐싱
+- **🧹 Quality** — 네이밍, DRY, 에러 핸들링, SOLID 원칙
+- **🎨 UX** — 로딩 상태, 접근성, 빈 상태, 반응형 디자인
 
 ### 📊 투표 시스템
 
@@ -29,20 +27,27 @@
 
 PR 파일 유형을 분석하여 에이전트별 가중치 자동 조정:
 
-```
-Frontend (.tsx, .css)  → 🎨 UX ×1.5   🔒 Security ×1.0
-Backend  (.ts, .sql)   → 🔒 Security ×1.5   🎨 UX ×0.5
-Infra    (.yml, .tf)   → 🔒 Security ×2.0   🎨 UX ×0.3
-```
+<table>
+<tr>
+  <th>PR 유형</th><th>Security</th><th>Performance</th><th>Quality</th><th>UX</th>
+</tr>
+<tr>
+  <td>Frontend (<code>.tsx</code>, <code>.css</code>)</td><td>×1.0</td><td>×0.8</td><td>×1.0</td><td><b>×1.5</b></td>
+</tr>
+<tr>
+  <td>Backend (<code>.ts</code>, <code>.sql</code>)</td><td><b>×1.5</b></td><td>×1.2</td><td>×1.0</td><td>×0.5</td>
+</tr>
+<tr>
+  <td>Infra (<code>.yml</code>, <code>.tf</code>)</td><td><b>×2.0</b></td><td>×0.5</td><td>×1.0</td><td>×0.3</td>
+</tr>
+</table>
 
 ### 💬 교차 검증 (Debate)
 
 에이전트들이 서로의 이슈를 검증:
 
-```
-Round 1: 독립 리뷰 (4개 에이전트 병렬 실행)
-Round 2: 교차 검증 (각 에이전트가 다른 에이전트의 이슈에 동의/반대/의견없음)
-```
+1. **Round 1** — 독립 리뷰 (4개 에이전트 병렬 실행)
+2. **Round 2** — 교차 검증 (각 에이전트가 다른 에이전트의 이슈에 동의/반대/의견없음)
 
 → 이슈별 **신뢰도 점수** 산출 (false positive 감소)
 
@@ -160,56 +165,52 @@ ignore:
 
 ## 📊 출력 예시
 
-```markdown
-## 🔍 simple-review-bot Review
+> 아래는 PR에 포스팅되는 리뷰 코멘트 예시입니다:
 
-### 📊 Dashboard
+<table>
+<tr><td colspan="5"><h3>🔍 simple-review-bot Review</h3></td></tr>
+<tr><td colspan="5">✅ <b>APPROVED</b> (3.2 / 4.0 weighted votes)</td></tr>
+<tr>
+  <th>Agent</th><th>Vote</th><th>Weight</th><th>Issues</th><th>Score</th>
+</tr>
+<tr>
+  <td>🔒 Security</td><td>✅ approve</td><td>×1.5</td><td>None</td><td>1.5</td>
+</tr>
+<tr>
+  <td>⚡ Performance</td><td>⚠️ conditional</td><td>×1.2</td><td>1 warning</td><td>0.6</td>
+</tr>
+<tr>
+  <td>🧹 Quality</td><td>✅ approve</td><td>×1.0</td><td>1 info</td><td>1.0</td>
+</tr>
+<tr>
+  <td>🎨 UX</td><td>❌ reject</td><td>×0.5</td><td>1 critical</td><td>0.0</td>
+</tr>
+<tr><td colspan="5"><code>▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░</code> 80% confidence</td></tr>
+</table>
 
-✅ **APPROVED** (3.2 / 4.0 weighted votes)
+**📋 Action Items**
 
-| Agent          | Vote           | Weight | Issues     | Score |
-| -------------- | -------------- | ------ | ---------- | ----- |
-| 🔒 Security    | ✅ approve     | ×1.5   | None       | 1.5   |
-| ⚡ Performance | ⚠️ conditional | ×1.2   | 1 warning  | 0.6   |
-| 🧹 Quality     | ✅ approve     | ×1.0   | 1 info     | 1.0   |
-| 🎨 UX          | ❌ reject      | ×0.5   | 1 critical | 0.0   |
-
-▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 80% confidence
-
-### 📋 Action Items
-
-- [ ] src/utils.ts:15의 중첩 루프 리팩토링 (⚡ Performance)
-```
+- [ ] `src/utils.ts:15`의 중첩 루프 리팩토링 (⚡ Performance)
 
 ---
 
 ## 🏗️ 아키텍처
 
-```
-PR Diff
-   │
-   ▼
-┌──────────────────────────────────────────────────────┐
-│              Round 1: 병렬 리뷰                       │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐│
-│  │🔒Security│ │⚡Perform.│ │🧹Quality │ │🎨  UX    ││
-│  └─────┬────┘ └─────┬────┘ └─────┬────┘ └─────┬────┘│
-│        └────────────┴────────────┴────────────┘      │
-│                         │                             │
-│                    자동 투표                           │
-│         (심각도 → approve/reject 판정)                 │
-│                         │                             │
-│              Round 2: 교차 검증                       │
-│       (에이전트들이 서로의 이슈 검증)                    │
-│                         │                             │
-│              가중치 적용 집계                           │
-│        (파일 유형에 따른 가중치 반영)                    │
-└──────────────────────────────────────────────────────┘
-   │
-   ▼
-PR 코멘트 (Dashboard + Issues + Action Items)
-   +
-GitHub 라벨 (approved / changes-requested)
+```mermaid
+flowchart TB
+    A[PR Diff] --> B[Round 1: 병렬 리뷰]
+
+    subgraph B[Round 1: 병렬 리뷰]
+        B1[🔒 Security]
+        B2[⚡ Performance]
+        B3[🧹 Quality]
+        B4[🎨 UX]
+    end
+
+    B --> C[자동 투표]
+    C --> D[Round 2: 교차 검증]
+    D --> E[가중치 적용 집계]
+    E --> F[PR 코멘트 + GitHub 라벨]
 ```
 
 ---

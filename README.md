@@ -10,12 +10,10 @@ Four expert agents review your PR **in parallel**, then cross-validate each othe
 
 ### 🤖 4 Agent Perspectives
 
-| Agent          | Role                  | Focus                                          |
-| -------------- | --------------------- | ---------------------------------------------- |
-| 🔒 Security    | Security Engineer     | Hardcoded secrets, injection, XSS, auth gaps   |
-| ⚡ Performance | Performance Engineer  | O(n²), N+1, memory leaks, caching              |
-| 🧹 Quality     | Code Quality Engineer | Naming, DRY, error handling, SOLID             |
-| 🎨 UX          | UX Engineer           | Loading states, a11y, empty states, responsive |
+- **🔒 Security** — Hardcoded secrets, injection, XSS, auth gaps
+- **⚡ Performance** — O(n²), N+1, memory leaks, caching
+- **🧹 Quality** — Naming, DRY, error handling, SOLID principles
+- **🎨 UX** — Loading states, a11y, empty states, responsive design
 
 ### 📊 Voting System
 
@@ -29,20 +27,27 @@ Agents automatically vote based on issue severity:
 
 Automatically adjusts agent weights based on PR file types:
 
-```
-Frontend (.tsx, .css)  → 🎨 UX ×1.5   🔒 Security ×1.0
-Backend  (.ts, .sql)   → 🔒 Security ×1.5   🎨 UX ×0.5
-Infra    (.yml, .tf)   → 🔒 Security ×2.0   🎨 UX ×0.3
-```
+<table>
+<tr>
+  <th>PR Type</th><th>Security</th><th>Performance</th><th>Quality</th><th>UX</th>
+</tr>
+<tr>
+  <td>Frontend (<code>.tsx</code>, <code>.css</code>)</td><td>×1.0</td><td>×0.8</td><td>×1.0</td><td><b>×1.5</b></td>
+</tr>
+<tr>
+  <td>Backend (<code>.ts</code>, <code>.sql</code>)</td><td><b>×1.5</b></td><td>×1.2</td><td>×1.0</td><td>×0.5</td>
+</tr>
+<tr>
+  <td>Infra (<code>.yml</code>, <code>.tf</code>)</td><td><b>×2.0</b></td><td>×0.5</td><td>×1.0</td><td>×0.3</td>
+</tr>
+</table>
 
 ### 💬 Cross-Review Debate
 
 Agents cross-validate each other's findings:
 
-```
-Round 1: Independent review (4 agents in parallel)
-Round 2: Cross-review (each agent evaluates others' issues with agree/disagree/abstain)
-```
+1. **Round 1** — Independent review (4 agents in parallel)
+2. **Round 2** — Cross-review (each agent evaluates others' issues with agree/disagree/abstain)
 
 → Per-issue **confidence score** (reduces false positives)
 
@@ -160,56 +165,52 @@ ignore:
 
 ## 📊 Output Example
 
-```markdown
-## 🔍 simple-review-bot Review
+> Below is an example of the review comment posted on your PR:
 
-### 📊 Dashboard
+<table>
+<tr><td colspan="5"><h3>🔍 simple-review-bot Review</h3></td></tr>
+<tr><td colspan="5">✅ <b>APPROVED</b> (3.2 / 4.0 weighted votes)</td></tr>
+<tr>
+  <th>Agent</th><th>Vote</th><th>Weight</th><th>Issues</th><th>Score</th>
+</tr>
+<tr>
+  <td>🔒 Security</td><td>✅ approve</td><td>×1.5</td><td>None</td><td>1.5</td>
+</tr>
+<tr>
+  <td>⚡ Performance</td><td>⚠️ conditional</td><td>×1.2</td><td>1 warning</td><td>0.6</td>
+</tr>
+<tr>
+  <td>🧹 Quality</td><td>✅ approve</td><td>×1.0</td><td>1 info</td><td>1.0</td>
+</tr>
+<tr>
+  <td>🎨 UX</td><td>❌ reject</td><td>×0.5</td><td>1 critical</td><td>0.0</td>
+</tr>
+<tr><td colspan="5"><code>▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░</code> 80% confidence</td></tr>
+</table>
 
-✅ **APPROVED** (3.2 / 4.0 weighted votes)
+**📋 Action Items**
 
-| Agent          | Vote           | Weight | Issues     | Score |
-| -------------- | -------------- | ------ | ---------- | ----- |
-| 🔒 Security    | ✅ approve     | ×1.5   | None       | 1.5   |
-| ⚡ Performance | ⚠️ conditional | ×1.2   | 1 warning  | 0.6   |
-| 🧹 Quality     | ✅ approve     | ×1.0   | 1 info     | 1.0   |
-| 🎨 UX          | ❌ reject      | ×0.5   | 1 critical | 0.0   |
-
-▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 80% confidence
-
-### 📋 Action Items
-
-- [ ] Refactor nested loop in src/utils.ts:15 (⚡ Performance)
-```
+- [ ] Refactor nested loop in `src/utils.ts:15` (⚡ Performance)
 
 ---
 
 ## 🏗️ Architecture
 
-```
-PR Diff
-   │
-   ▼
-┌──────────────────────────────────────────────────────┐
-│                 Round 1: Parallel Review              │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐│
-│  │🔒Security│ │⚡Perform.│ │🧹Quality │ │🎨  UX    ││
-│  └─────┬────┘ └─────┬────┘ └─────┬────┘ └─────┬────┘│
-│        └────────────┴────────────┴────────────┘      │
-│                         │                             │
-│                    Auto Vote                          │
-│           (severity → approve/reject)                 │
-│                         │                             │
-│                 Round 2: Cross-Review                 │
-│          (agents validate each other)                 │
-│                         │                             │
-│              Weighted Vote Counting                   │
-│         (file type weights applied)                   │
-└──────────────────────────────────────────────────────┘
-   │
-   ▼
-PR Comment (Dashboard + Issues + Action Items)
-   +
-GitHub Label (approved / changes-requested)
+```mermaid
+flowchart TB
+    A[PR Diff] --> B[Round 1: Parallel Review]
+
+    subgraph B[Round 1: Parallel Review]
+        B1[🔒 Security]
+        B2[⚡ Performance]
+        B3[🧹 Quality]
+        B4[🎨 UX]
+    end
+
+    B --> C[Auto Vote]
+    C --> D[Round 2: Cross-Review]
+    D --> E[Weighted Vote Counting]
+    E --> F[PR Comment + GitHub Label]
 ```
 
 ---
