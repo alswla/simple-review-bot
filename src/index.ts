@@ -1,5 +1,5 @@
 import * as core from "@actions/core";
-import { createProvider } from "./providers";
+import { createProvider, selectModel, countChangedLines } from "./providers";
 import {
   SecurityAgent,
   PerformanceAgent,
@@ -10,7 +10,7 @@ import {
 import { GitHubClient } from "./github/client";
 import { filterDiff } from "./github/diff";
 import { formatComment } from "./github/comment";
-import { loadConfig } from "./utils/config";
+import { loadConfig, normalizeAgentConfig } from "./utils/config";
 import { castVote, countVotes, AgentVote } from "./review/voter";
 import { determineWeights, getAgentWeight } from "./review/weigher";
 import { runDebate, EnrichedIssue } from "./review/debate";
@@ -30,7 +30,10 @@ async function run(): Promise<void> {
       core.getInput("api_key") ||
       "";
 
-    if (!apiKey) {
+    // For Vertex AI, API key is not required
+    const isVertexAI = config.provider.vertexai === true;
+
+    if (!apiKey && !isVertexAI) {
       throw new Error(
         `API key is required. Set '${providerType}_api_key' input.`,
       );
@@ -41,6 +44,12 @@ async function run(): Promise<void> {
       type: providerType as "openai" | "claude" | "gemini",
       apiKey,
       model: config.provider.model,
+      vertexai: config.provider.vertexai,
+      project: config.provider.project || core.getInput("gcp_project"),
+      location:
+        config.provider.location ||
+        core.getInput("gcp_location") ||
+        "us-central1",
     });
     logger.info(`Provider initialized: ${provider.name}`);
 
@@ -76,7 +85,15 @@ async function run(): Promise<void> {
           "\n\n... (diff truncated due to size)"
         : diff;
 
-    // 7. Determine agent weights based on file types
+    // 7. Tiered model selection (auto-select model based on diff size)
+    let tieredModel: string | undefined;
+    if (config.tiered_model?.enabled) {
+      const changedLines = countChangedLines(rawDiff);
+      tieredModel = selectModel(providerType, changedLines);
+      logger.info(`Tiered model: ${changedLines} lines → ${tieredModel}`);
+    }
+
+    // 8. Determine agent weights based on file types
     const weights = determineWeights(
       rawDiff,
       config.weights?.auto_detect !== false
@@ -87,33 +104,44 @@ async function run(): Promise<void> {
       `Weights: Security=${weights.security} Performance=${weights.performance} Quality=${weights.quality} UX=${weights.ux}`,
     );
 
-    // 8. Initialize agents based on config
-    const agentConfig = config.agents || {};
-    const allAgents: { key: string; agent: Agent }[] = [
-      { key: "security", agent: new SecurityAgent() },
-      { key: "performance", agent: new PerformanceAgent() },
-      { key: "quality", agent: new QualityAgent() },
-      { key: "ux", agent: new UXAgent() },
+    // 9. Initialize agents based on config (supports boolean and object formats)
+    const allAgentEntries = [
+      { key: "security", agent: new SecurityAgent() as Agent },
+      { key: "performance", agent: new PerformanceAgent() as Agent },
+      { key: "quality", agent: new QualityAgent() as Agent },
+      { key: "ux", agent: new UXAgent() as Agent },
     ];
 
-    const agents = allAgents
-      .filter(
-        ({ key }) => agentConfig[key as keyof typeof agentConfig] !== false,
-      )
-      .map(({ agent }) => agent);
+    const agentConfigs = config.agents || {};
+    const agents: { agent: Agent; model?: string }[] = [];
+    for (const { key, agent } of allAgentEntries) {
+      const agentCfg = normalizeAgentConfig(
+        agentConfigs[key as keyof typeof agentConfigs],
+      );
+      if (agentCfg.enabled) {
+        agents.push({ agent, model: agentCfg.model });
+      }
+    }
 
     if (agents.length === 0) {
       logger.warn("No agents enabled. Skipping review.");
       return;
     }
 
-    // 9. Run reviews in parallel (Round 1)
+    // 10. Run reviews in parallel (Round 1)
+    // Priority: per-agent model > tiered model > default model
     logger.info(`🔍 Running reviews with ${agents.length} agents...`);
     const reviews = await Promise.all(
-      agents.map((agent) => agent.review(truncatedDiff, provider)),
+      agents.map(({ agent, model: agentModel }) => {
+        const modelToUse = agentModel || tieredModel;
+        if (modelToUse) {
+          return agent.reviewWithModel(truncatedDiff, provider, modelToUse);
+        }
+        return agent.review(truncatedDiff, provider);
+      }),
     );
 
-    // 10. Cast votes based on review results
+    // 11. Cast votes based on review results
     const votes: AgentVote[] = reviews.map((review) =>
       castVote(
         review.agent,
@@ -123,7 +151,7 @@ async function run(): Promise<void> {
       ),
     );
 
-    // 11. Run debate (Round 2 — cross-review) if enabled
+    // 12. Run debate (Round 2 — cross-review) if enabled
     let enrichedIssues: EnrichedIssue[] | undefined;
     const debateConfig = config.debate || {};
 
@@ -134,7 +162,7 @@ async function run(): Promise<void> {
       });
     }
 
-    // 12. Count votes with weighted scoring
+    // 13. Count votes with weighted scoring
     const votingSummary = countVotes(votes, {
       requiredApprovals: config.voting?.required_approvals ?? 2,
       conditionalWeight: config.voting?.conditional_weight ?? 0.5,
@@ -144,7 +172,7 @@ async function run(): Promise<void> {
       `Vote result: ${votingSummary.verdict} (${votingSummary.totalWeightedScore.toFixed(1)}/${votingSummary.maxPossibleScore.toFixed(1)})`,
     );
 
-    // 13. Format and post comment
+    // 14. Format and post comment
     const comment = formatComment(
       reviews,
       votes,
@@ -153,7 +181,7 @@ async function run(): Promise<void> {
     );
     await github.postComment(prNumber, comment);
 
-    // 14. Apply label if enabled
+    // 15. Apply label if enabled
     if (config.labels?.enabled) {
       const labelMap: Record<string, string> = {
         approved: config.labels.approved || "review:approved",

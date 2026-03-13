@@ -2,16 +2,28 @@ import * as fs from "fs";
 import * as yaml from "js-yaml";
 import * as core from "@actions/core";
 
+export interface AgentConfig {
+  enabled?: boolean;
+  model?: string;
+}
+
 export interface PRLensConfig {
   provider: {
     type: "openai" | "claude" | "gemini";
     model?: string;
+    // Gemini Vertex AI
+    vertexai?: boolean;
+    project?: string;
+    location?: string;
   };
   agents?: {
-    security?: boolean;
-    performance?: boolean;
-    quality?: boolean;
-    ux?: boolean;
+    security?: boolean | AgentConfig;
+    performance?: boolean | AgentConfig;
+    quality?: boolean | AgentConfig;
+    ux?: boolean | AgentConfig;
+  };
+  tiered_model?: {
+    enabled?: boolean;
   };
   voting?: {
     required_approvals?: number;
@@ -56,6 +68,9 @@ const DEFAULT_CONFIG: PRLensConfig = {
     quality: true,
     ux: true,
   },
+  tiered_model: {
+    enabled: false,
+  },
   voting: {
     required_approvals: 2,
     conditional_weight: 0.5,
@@ -83,6 +98,19 @@ const DEFAULT_CONFIG: PRLensConfig = {
   },
 };
 
+/**
+ * Normalize agent config: supports both boolean and object formats.
+ * - `security: true` → `{ enabled: true }`
+ * - `security: { enabled: true, model: 'gpt-4o' }` → as-is
+ */
+export function normalizeAgentConfig(
+  value: boolean | AgentConfig | undefined,
+): AgentConfig {
+  if (value === undefined) return { enabled: true };
+  if (typeof value === "boolean") return { enabled: value };
+  return { enabled: value.enabled !== false, model: value.model };
+}
+
 export function loadConfig(configPath?: string): PRLensConfig {
   const path =
     configPath || core.getInput("config_path") || ".github/pr-lens.yml";
@@ -102,6 +130,10 @@ export function loadConfig(configPath?: string): PRLensConfig {
         agents: {
           ...DEFAULT_CONFIG.agents,
           ...userConfig.agents,
+        },
+        tiered_model: {
+          ...DEFAULT_CONFIG.tiered_model,
+          ...userConfig.tiered_model,
         },
         voting: {
           ...DEFAULT_CONFIG.voting,
