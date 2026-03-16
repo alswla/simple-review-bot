@@ -72,35 +72,60 @@ function formatVoteTable(votes: AgentVote[]): string {
 }
 
 /**
- * Format enriched issues with cross-review data.
+ * Format enriched issues grouped by agent.
  */
 function formatEnrichedIssues(issues: EnrichedIssue[]): string {
   if (issues.length === 0) return "_No issues found._ ✨\n";
 
-  const blocks = issues.map((issue) => {
-    const sevEmoji = SEVERITY_EMOJI[issue.severity] || "💡";
-    const location = issue.line ? `${issue.file}:${issue.line}` : issue.file;
-    const badge = confidenceBadge(issue.confidence);
-    const crossReview = formatCrossReviews(issue.crossReviews);
+  // Group by agent
+  const byAgent = new Map<string, { emoji: string; issues: EnrichedIssue[] }>();
+  for (const issue of issues) {
+    const key = issue.foundBy;
+    if (!byAgent.has(key)) {
+      byAgent.set(key, { emoji: issue.foundByEmoji, issues: [] });
+    }
+    byAgent.get(key)!.issues.push(issue);
+  }
 
-    const lines = [
-      `<details>`,
-      `<summary>${sevEmoji} <b>${issue.issue}</b> — <code>${location}</code> ${badge}</summary>`,
-      "",
-      `**Found by:** ${issue.foundByEmoji} ${issue.foundBy}`,
-    ];
+  const sections: string[] = [];
 
-    if (crossReview) {
-      lines.push(crossReview);
+  for (const [agentName, { emoji, issues: agentIssues }] of byAgent) {
+    sections.push(`#### ${emoji} ${agentName} (${agentIssues.length} issues)\n`);
+
+    // Table header
+    sections.push("| Severity | Location | Issue | Confidence |");
+    sections.push("|:---------|:---------|:------|:-----------|");
+
+    for (const issue of agentIssues) {
+      const sevEmoji = SEVERITY_EMOJI[issue.severity] || "💡";
+      const location = issue.line
+        ? `\`${issue.file}:${issue.line}\``
+        : `\`${issue.file}\``;
+      const badge = confidenceBadge(issue.confidence);
+
+      sections.push(
+        `| ${sevEmoji} ${issue.severity} | ${location} | ${issue.issue} | ${badge} |`,
+      );
     }
 
-    lines.push(`**Suggestion:** ${issue.suggestion}`);
-    lines.push("", "</details>", "");
+    // Expandable suggestions
+    sections.push("");
+    sections.push("<details>");
+    sections.push(`<summary>💡 Suggestions for ${emoji} ${agentName}</summary>`);
+    sections.push("");
+    for (const issue of agentIssues) {
+      const location = issue.line
+        ? `\`${issue.file}:${issue.line}\``
+        : `\`${issue.file}\``;
+      sections.push(`- **${issue.issue}** (${location})`);
+      sections.push(`  > ${issue.suggestion}`);
+    }
+    sections.push("");
+    sections.push("</details>");
+    sections.push("");
+  }
 
-    return lines.join("\n");
-  });
-
-  return blocks.join("\n");
+  return sections.join("\n");
 }
 
 /**

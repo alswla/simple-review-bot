@@ -65250,30 +65250,51 @@ function formatVoteTable(votes) {
     ].join("\n");
 }
 /**
- * Format enriched issues with cross-review data.
+ * Format enriched issues grouped by agent.
  */
 function formatEnrichedIssues(issues) {
     if (issues.length === 0)
         return "_No issues found._ ✨\n";
-    const blocks = issues.map((issue) => {
-        const sevEmoji = SEVERITY_EMOJI[issue.severity] || "💡";
-        const location = issue.line ? `${issue.file}:${issue.line}` : issue.file;
-        const badge = confidenceBadge(issue.confidence);
-        const crossReview = formatCrossReviews(issue.crossReviews);
-        const lines = [
-            `<details>`,
-            `<summary>${sevEmoji} <b>${issue.issue}</b> — <code>${location}</code> ${badge}</summary>`,
-            "",
-            `**Found by:** ${issue.foundByEmoji} ${issue.foundBy}`,
-        ];
-        if (crossReview) {
-            lines.push(crossReview);
+    // Group by agent
+    const byAgent = new Map();
+    for (const issue of issues) {
+        const key = issue.foundBy;
+        if (!byAgent.has(key)) {
+            byAgent.set(key, { emoji: issue.foundByEmoji, issues: [] });
         }
-        lines.push(`**Suggestion:** ${issue.suggestion}`);
-        lines.push("", "</details>", "");
-        return lines.join("\n");
-    });
-    return blocks.join("\n");
+        byAgent.get(key).issues.push(issue);
+    }
+    const sections = [];
+    for (const [agentName, { emoji, issues: agentIssues }] of byAgent) {
+        sections.push(`#### ${emoji} ${agentName} (${agentIssues.length} issues)\n`);
+        // Table header
+        sections.push("| Severity | Location | Issue | Confidence |");
+        sections.push("|:---------|:---------|:------|:-----------|");
+        for (const issue of agentIssues) {
+            const sevEmoji = SEVERITY_EMOJI[issue.severity] || "💡";
+            const location = issue.line
+                ? `\`${issue.file}:${issue.line}\``
+                : `\`${issue.file}\``;
+            const badge = confidenceBadge(issue.confidence);
+            sections.push(`| ${sevEmoji} ${issue.severity} | ${location} | ${issue.issue} | ${badge} |`);
+        }
+        // Expandable suggestions
+        sections.push("");
+        sections.push("<details>");
+        sections.push(`<summary>💡 Suggestions for ${emoji} ${agentName}</summary>`);
+        sections.push("");
+        for (const issue of agentIssues) {
+            const location = issue.line
+                ? `\`${issue.file}:${issue.line}\``
+                : `\`${issue.file}\``;
+            sections.push(`- **${issue.issue}** (${location})`);
+            sections.push(`  > ${issue.suggestion}`);
+        }
+        sections.push("");
+        sections.push("</details>");
+        sections.push("");
+    }
+    return sections.join("\n");
 }
 /**
  * Format action items checklist from reject/conditional votes.
@@ -66154,11 +66175,13 @@ function parseCrossReviewResponse(raw, reviewerAgent, reviewerEmoji, targetAgent
 /**
  * Calculate confidence score for an issue based on cross-reviews.
  * confidence = agree / (agree + disagree) * 100
- * If only abstains, confidence = 50 (neutral)
+ * If no cross-reviews or only abstains → confidence = 50 (neutral).
  */
 function calculateConfidence(crossReviews) {
-    const agrees = crossReviews.filter((r) => r.verdict === "agree").length;
-    const disagrees = crossReviews.filter((r) => r.verdict === "disagree").length;
+    if (crossReviews.length === 0)
+        return 50; // No cross-reviews → neutral
+    const agrees = crossReviews.filter((r) => r.verdict === 'agree').length;
+    const disagrees = crossReviews.filter((r) => r.verdict === 'disagree').length;
     const total = agrees + disagrees;
     if (total === 0)
         return 50; // All abstained → neutral
@@ -66214,7 +66237,9 @@ async function runDebate(provider, reviews, config = DEFAULT_DEBATE_CONFIG) {
     for (const review of reviews) {
         for (let i = 0; i < review.issues.length; i++) {
             const issue = review.issues[i];
-            const crossReviews = allCrossReviews.filter((cr) => cr.targetAgent === review.agent && cr.issueIndex === i);
+            // Match cross-reviews: try both 0-based and 1-based issueIndex
+            const crossReviews = allCrossReviews.filter((cr) => cr.targetAgent === review.agent &&
+                (cr.issueIndex === i || cr.issueIndex === i + 1));
             enrichedIssues.push({
                 ...issue,
                 foundBy: review.agent,
