@@ -42,22 +42,32 @@ PR 파일 유형에 따라 에이전트 가중치 자동 조정:
 </tr>
 </table>
 
-### 💬 교차 검증 토론
+### 💬 교차 검증 토론 (기본 활성)
 
 에이전트가 서로의 발견을 교차 검증:
 
-1. **Round 1** — 독립 리뷰 (4개 에이전트 병렬)
+1. **Round 1** — 독립 리뷰 (4개 에이전트 병렬, 에이전트당 최대 3개 이슈)
 2. **Round 2** — 교차 검증 (각 에이전트가 다른 에이전트의 이슈에 agree/disagree/abstain)
 
-→ 이슈별 **confidence score** (거짓 양성 감소)
+→ 이슈별 **confidence score** — 50% 미만인 이슈는 자동으로 필터링
 
 ### 📝 PR 요약
 
-LLM을 사용하여 PR 변경사항의 간결한 요약을 자동 생성합니다.
+LLM을 사용하여 PR 변경사항의 간결한 요약을 자동 생성합니다. `output.language` 설정에 따라 언어가 결정됩니다. 삭제만 있는 PR에도 요약이 생성됩니다.
 
 ### 📌 인라인 리뷰 코멘트
 
-신뢰도 높은 이슈는 **코드에 직접 인라인 코멘트**로 게시됩니다. 토론 후 confidence ≥ 50% 이슈만 인라인 코멘트가 달립니다.
+신뢰도 높은 이슈는 **코드에 직접 인라인 코멘트**로 게시됩니다. 봇은 항상 `COMMENT` 이벤트만 사용하며 (`REQUEST_CHANGES` 사용 안 함), PR을 블로킹하지 않습니다 — 사람이 승인/거절을 결정합니다.
+
+### 🎯 엄격한 Severity 기준
+
+에이전트는 엄격한 심각도 기준을 따릅니다:
+
+- 🔴 **critical** — 즉시 악용 가능 (injection, 인증 우회) 또는 버그/크래시 유발
+- 🟡 **warning** — 개선 필요하지만 즉시 위험하지 않음 (검증 부족, 메모리 누수 가능성)
+- 💡 **info** — 마이너 제안 또는 모범 사례
+
+에이전트는 아키텍처 변경을 제안하지 않습니다 (예: "Redis를 사용하라") — 현재 코드만 리뷰합니다.
 
 ### 🏷️ 자동 라벨
 
@@ -73,7 +83,7 @@ PR 코멘트에 `/review`를 입력하면 리뷰를 다시 실행합니다.
 
 ### 🚫 Hard Cut
 
-대형 PR 자동 스킵 (기본값: 파일 300개 또는 변경 10,000줄 초과).
+대형 PR 자동 스킵 (기본값: 파일 300개 또는 변경 10,000줄 초과). 삭제만 있는 파일도 리뷰에서 제외됩니다.
 
 ---
 
@@ -184,10 +194,10 @@ voting:
   required_approvals: 2
   conditional_weight: 0.5
 
-# 교차 검증 토론
+# 교차 검증 토론 (기본 활성)
 debate:
-  enabled: true
-  trigger: on-critical # always | on-critical | on-disagreement
+  enabled: true          # 기본값: true
+  trigger: always        # always | on-critical | on-disagreement (기본값: always)
 
 # 자동 가중치 감지
 weights:
@@ -265,7 +275,7 @@ ignore:
 <tr>
   <td>🎨 UX</td><td>❌ reject</td><td>×0.5</td><td>1 critical</td><td>0.0</td>
 </tr>
-<tr><td colspan="5"><code>▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░</code> 80% confidence</td></tr>
+<tr><td colspan="5"><code>▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░</code> 80% approval score</td></tr>
 </table>
 
 **📋 액션 아이템**
