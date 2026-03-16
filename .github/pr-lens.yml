@@ -1,0 +1,16 @@
+# PR Lens Config for testing
+provider:
+  type: gemini
+
+debate:
+  enabled: true
+  trigger: on-critical
+
+labels:
+  enabled: true
+
+summary:
+  enabled: true
+
+output:
+  language: ko

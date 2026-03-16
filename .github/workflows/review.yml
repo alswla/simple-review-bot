@@ -1,8 +1,9 @@
-# Example: Basic AI Code Review Workflow
 name: AI Code Review
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
@@ -11,10 +12,18 @@ permissions:
 jobs:
   review:
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       contains(github.event.comment.body, '/review'))
     steps:
       - uses: actions/checkout@v4
-      - uses: your-name/pr-lens@v1
         with:
-          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number) || '' }}
+      - uses: ./
+        with:
+          provider: gemini
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
