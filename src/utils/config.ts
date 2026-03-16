@@ -5,6 +5,8 @@ import * as core from "@actions/core";
 export interface AgentConfig {
   enabled?: boolean;
   model?: string;
+  provider?: 'openai' | 'claude' | 'gemini';
+  api_key?: string;
 }
 
 export interface PRLensConfig {
@@ -124,7 +126,12 @@ export function normalizeAgentConfig(
 ): AgentConfig {
   if (value === undefined) return { enabled: true };
   if (typeof value === "boolean") return { enabled: value };
-  return { enabled: value.enabled !== false, model: value.model };
+  return {
+    enabled: value.enabled !== false,
+    model: value.model,
+    provider: value.provider,
+    api_key: value.api_key,
+  };
 }
 
 export function loadConfig(configPath?: string): PRLensConfig {

@@ -1,6 +1,7 @@
-import * as core from "@actions/core";
-import * as github from "@actions/github";
-import { createProvider, selectModel, countChangedLines } from "./providers";
+import * as core from '@actions/core';
+import * as github from '@actions/github';
+import { createProvider, selectModel, countChangedLines } from './providers';
+import { LLMProvider } from './providers/base';
 import {
   SecurityAgent,
   PerformanceAgent,
@@ -141,16 +142,16 @@ async function run(): Promise<void> {
       `Weights: Security=${weights.security} Performance=${weights.performance} Quality=${weights.quality} UX=${weights.ux}`,
     );
 
-    // 12. Initialize agents with custom guidelines
+    // 12. Initialize agents with custom guidelines and per-agent providers
     const allAgentEntries = [
-      { key: "security", agent: new SecurityAgent() as Agent },
-      { key: "performance", agent: new PerformanceAgent() as Agent },
-      { key: "quality", agent: new QualityAgent() as Agent },
-      { key: "ux", agent: new UXAgent() as Agent },
+      { key: 'security', agent: new SecurityAgent() as Agent },
+      { key: 'performance', agent: new PerformanceAgent() as Agent },
+      { key: 'quality', agent: new QualityAgent() as Agent },
+      { key: 'ux', agent: new UXAgent() as Agent },
     ];
 
     const agentConfigs = config.agents || {};
-    const agents: { agent: Agent; model?: string }[] = [];
+    const agents: { agent: Agent; model?: string; agentProvider?: LLMProvider }[] = [];
 
     for (const { key, agent } of allAgentEntries) {
       const agentCfg = normalizeAgentConfig(
@@ -161,24 +162,46 @@ async function run(): Promise<void> {
         const guidelines = loadGuidelines(key);
         agent.systemPrompt = buildPrompt(agent.systemPrompt, guidelines);
 
-        agents.push({ agent, model: agentCfg.model });
+        // Create per-agent provider if configured
+        let agentProvider: LLMProvider | undefined;
+        if (agentCfg.provider) {
+          const agentApiKey =
+            agentCfg.api_key ||
+            core.getInput(`${agentCfg.provider}_api_key`) ||
+            '';
+          if (agentApiKey) {
+            agentProvider = createProvider({
+              type: agentCfg.provider,
+              apiKey: agentApiKey,
+              model: agentCfg.model,
+            });
+            logger.info(
+              `${key}: using ${agentCfg.provider} provider`,
+            );
+          }
+        }
+
+        agents.push({ agent, model: agentCfg.model, agentProvider });
       }
     }
 
     if (agents.length === 0) {
-      logger.warn("No agents enabled. Skipping review.");
+      logger.warn('No agents enabled. Skipping review.');
       return;
     }
 
     // 13. Run reviews in parallel (Round 1)
+    // Priority: per-agent provider > default provider
+    // Priority for model: per-agent model > tiered model > provider default
     logger.info(`🔍 Running reviews with ${agents.length} agents...`);
     const reviews = await Promise.all(
-      agents.map(({ agent, model: agentModel }) => {
+      agents.map(({ agent, model: agentModel, agentProvider }) => {
+        const effectiveProvider = agentProvider || provider;
         const modelToUse = agentModel || tieredModel;
         if (modelToUse) {
-          return agent.reviewWithModel(truncatedDiff, provider, modelToUse);
+          return agent.reviewWithModel(truncatedDiff, effectiveProvider, modelToUse);
         }
-        return agent.review(truncatedDiff, provider);
+        return agent.review(truncatedDiff, effectiveProvider);
       }),
     );
 
