@@ -158,9 +158,10 @@ async function run(): Promise<void> {
         agentConfigs[key as keyof typeof agentConfigs],
       );
       if (agentCfg.enabled) {
-        // Load and apply custom guidelines
+        // Load and apply custom guidelines + language
         const guidelines = loadGuidelines(key);
-        agent.systemPrompt = buildPrompt(agent.systemPrompt, guidelines);
+        const language = config.output?.language;
+        agent.systemPrompt = buildPrompt(agent.systemPrompt, guidelines, language);
 
         // Create per-agent provider if configured
         let agentProvider: LLMProvider | undefined;

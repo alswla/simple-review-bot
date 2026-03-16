@@ -32,24 +32,43 @@ export function loadGuidelines(
   };
 }
 
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: 'English',
+  ko: 'Korean',
+  ja: 'Japanese',
+  zh: 'Chinese',
+  es: 'Spanish',
+  fr: 'French',
+  de: 'German',
+  pt: 'Portuguese',
+};
+
 /**
- * Build the final prompt from default + guidelines.
+ * Build the final prompt from default + guidelines + language.
  *
  * Priority:
  * 1. If agent-specific .md exists → replaces built-in prompt
  * 2. If not → uses built-in prompt
  * 3. common.md → always appended at the end
+ * 4. language → appended as response language instruction
  */
 export function buildPrompt(
   defaultPrompt: string,
   guidelines: GuidelineSet,
+  language?: string,
 ): string {
   // Use custom agent prompt if provided, otherwise use default
   let prompt = guidelines.agent || defaultPrompt;
 
   // Always append common guidelines if they exist
   if (guidelines.common) {
-    prompt += "\n\n## Additional Team Guidelines\n\n" + guidelines.common;
+    prompt += '\n\n## Additional Team Guidelines\n\n' + guidelines.common;
+  }
+
+  // Append language instruction if not English
+  if (language && language !== 'en') {
+    const langName = LANGUAGE_NAMES[language] || language;
+    prompt += `\n\nIMPORTANT: You MUST write ALL your responses (issue descriptions, suggestions, summaries) in ${langName}. The JSON keys must remain in English, but all values must be in ${langName}.`;
   }
 
   return prompt;

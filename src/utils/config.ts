@@ -59,8 +59,9 @@ export interface PRLensConfig {
     discussion?: string;
   };
   output?: {
-    style?: "detailed" | "summary";
+    style?: 'detailed' | 'summary';
     includeEmoji?: boolean;
+    language?: string;  // en, ko, ja, zh, es, etc.
   };
   ignore?: {
     files?: string[];
@@ -107,8 +108,9 @@ const DEFAULT_CONFIG: PRLensConfig = {
     discussion: "review:needs-discussion",
   },
   output: {
-    style: "detailed",
+    style: 'detailed',
     includeEmoji: true,
+    language: 'en',
   },
   ignore: {
     files: ["*.lock", "*.generated.*"],
