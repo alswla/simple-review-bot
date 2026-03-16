@@ -65745,11 +65745,9 @@ async function run() {
         // 18. Post inline review comments (high-confidence issues only)
         const inlineComments = (0, comment_1.buildInlineComments)(enrichedIssues, reviews);
         if (inlineComments.length > 0) {
-            const reviewEvent = votingSummary.verdict === "approved"
-                ? "COMMENT"
-                : votingSummary.verdict === "changes-requested"
-                    ? "REQUEST_CHANGES"
-                    : "COMMENT";
+            const reviewEvent = votingSummary.verdict === 'approved'
+                ? 'APPROVE'
+                : 'COMMENT';
             await ghClient.createInlineReview(prNumber, inlineComments, `🔍 simple-review-bot found ${inlineComments.length} issue(s) requiring attention.`, reviewEvent);
         }
         // 19. Apply label if enabled
