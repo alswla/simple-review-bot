@@ -4,7 +4,7 @@
 
 📖 [한국어 문서 (Korean)](./README_KO.md)
 
-Four expert agents review your PR **in parallel**, then cross-validate each other's findings to deliver high-confidence code reviews.
+Four expert agents review your PR **in parallel**, cross-validate each other's findings, and deliver high-confidence code reviews with inline comments.
 
 ## ✨ Features
 
@@ -51,6 +51,14 @@ Agents cross-validate each other's findings:
 
 → Per-issue **confidence score** (reduces false positives)
 
+### 📝 PR Summary
+
+Automatically generates a concise summary of PR changes using LLM.
+
+### 📌 Inline Review Comments
+
+High-confidence issues are posted as **inline comments directly on the code** (not just a single big comment). After debate, only issues with confidence ≥ 50% get inline comments.
+
 ### 🏷️ Auto Labels
 
 Automatically applies PR labels based on vote results:
@@ -58,6 +66,14 @@ Automatically applies PR labels based on vote results:
 - `review:approved` 🟢
 - `review:changes-requested` 🔴
 - `review:needs-discussion` 🟡
+
+### 🔄 Re-Review via Comment
+
+Type `/review` in a PR comment to re-trigger the review.
+
+### 🚫 Hard Cut
+
+Automatically skips review for oversized PRs (default: 300 files or 10,000 lines).
 
 ---
 
@@ -69,6 +85,8 @@ name: AI Code Review
 on:
   pull_request:
     types: [opened, synchronize]
+  issue_comment:
+    types: [created]  # For /review re-trigger
 
 permissions:
   contents: read
@@ -77,6 +95,11 @@ permissions:
 jobs:
   review:
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       contains(github.event.comment.body, '/review'))
     steps:
       - uses: actions/checkout@v4
       - uses: minjihan/simple-review-bot@v1
@@ -105,6 +128,17 @@ jobs:
   with:
     provider: gemini
     gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+
+# Gemini via GCP Vertex AI (no API key needed)
+- uses: google-github-actions/auth@v2
+  with:
+    credentials_json: ${{ secrets.GCP_SA_KEY }}
+- uses: minjihan/simple-review-bot@v1
+  with:
+    provider: gemini
+    gcp_project: ${{ secrets.GCP_PROJECT_ID }}
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ---
@@ -119,12 +153,31 @@ provider:
   type: openai
   model: gpt-4o
 
-# Enable/disable agents
+# Agent configuration (boolean or object)
 agents:
   security: true
   performance: true
-  quality: true
-  ux: false # Disable for backend-only repos
+  quality:
+    enabled: true
+    model: gpt-4o-mini        # Per-agent model override
+  ux:
+    enabled: true
+    provider: gemini           # Per-agent provider
+    model: gemini-2.5-flash
+
+# Tiered model selection (auto-select model by diff size)
+tiered_model:
+  enabled: true
+
+# Hard cut — skip oversized PRs
+hard_cut:
+  enabled: true
+  max_changed_files: 300
+  max_changed_lines: 10000
+
+# PR summary generation
+summary:
+  enabled: true
 
 # Voting
 voting:
@@ -161,6 +214,33 @@ ignore:
     - "dist/"
 ```
 
+### 🎨 Custom Prompt Guidelines
+
+Create `.github/review-bot/` to customize agent prompts:
+
+```
+.github/review-bot/
+├── common.md        # Appended to ALL agents
+├── security.md      # Replaces Security agent prompt
+├── performance.md   # Replaces Performance agent prompt
+├── quality.md       # Replaces Quality agent prompt
+└── ux.md            # Replaces UX agent prompt
+```
+
+Priority:
+1. Agent-specific `.md` (if exists) → **replaces** built-in prompt
+2. Built-in prompt (fallback)
+3. `common.md` → **always appended** to all agents
+
+Example `common.md`:
+```markdown
+# Team Guidelines
+- This is an e-commerce platform
+- All APIs follow REST conventions
+- Error codes use ERR_ prefix
+- Korean comments are acceptable
+```
+
 ---
 
 ## 📊 Output Example
@@ -169,6 +249,7 @@ ignore:
 
 <table>
 <tr><td colspan="5"><h3>🔍 simple-review-bot Review</h3></td></tr>
+<tr><td colspan="5">📝 <b>PR Summary</b>: Added user authentication with JWT tokens and rate limiting</td></tr>
 <tr><td colspan="5">✅ <b>APPROVED</b> (3.2 / 4.0 weighted votes)</td></tr>
 <tr>
   <th>Agent</th><th>Vote</th><th>Weight</th><th>Issues</th><th>Score</th>
@@ -210,7 +291,7 @@ flowchart TB
     B --> C[Auto Vote]
     C --> D[Round 2: Cross-Review]
     D --> E[Weighted Vote Counting]
-    E --> F[PR Comment + GitHub Label]
+    E --> F[PR Comment + Inline Comments + Label]
 ```
 
 ---
@@ -231,11 +312,12 @@ simple-review-bot/
 ├── action.yml              # GitHub Action definition
 ├── src/
 │   ├── index.ts            # Main entry point
-│   ├── agents/             # 4 review agents
+│   ├── agents/             # 4 review agents + BaseAgent
 │   ├── providers/          # LLM providers (OpenAI / Claude / Gemini)
-│   ├── review/             # Voting + debate system
-│   ├── github/             # GitHub API integration
-│   └── utils/              # Config, errors, retry, logger
+│   │   └── tiered-model.ts # Auto model selection by diff size
+│   ├── review/             # Voting + debate + summary
+│   ├── github/             # GitHub API (comments, inline reviews, labels)
+│   └── utils/              # Config, guidelines, errors, retry, logger
 └── dist/                   # Bundled output
 ```
 

@@ -1,5 +1,5 @@
 name: "simple-review-bot"
-description: "AI Code Review with multiple perspectives, voting, and cross-review debate"
+description: "AI Code Review with multiple perspectives, voting, cross-review debate, and inline comments"
 author: "minjihan"
 
 branding:
@@ -20,6 +20,13 @@ inputs:
   gemini_api_key:
     description: "Google Gemini API key"
     required: false
+  gcp_project:
+    description: "GCP project ID for Vertex AI"
+    required: false
+  gcp_location:
+    description: "GCP location for Vertex AI (default: us-central1)"
+    required: false
+    default: "us-central1"
   config_path:
     description: "Path to config file"
     required: false
