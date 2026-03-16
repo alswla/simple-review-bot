@@ -11,6 +11,8 @@ Focus on:
 5. Input validation gaps
 6. Unsafe functions (eval, exec, etc.)
 
+IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues.
+
 Respond ONLY in JSON format (no markdown, no code blocks):
 {
   "severity": "critical" | "warning" | "info",
