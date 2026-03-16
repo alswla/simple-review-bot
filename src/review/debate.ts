@@ -138,11 +138,13 @@ function parseCrossReviewResponse(
 /**
  * Calculate confidence score for an issue based on cross-reviews.
  * confidence = agree / (agree + disagree) * 100
- * If only abstains, confidence = 50 (neutral)
+ * If no cross-reviews or only abstains → confidence = 50 (neutral).
  */
 function calculateConfidence(crossReviews: CrossReviewResult[]): number {
-  const agrees = crossReviews.filter((r) => r.verdict === "agree").length;
-  const disagrees = crossReviews.filter((r) => r.verdict === "disagree").length;
+  if (crossReviews.length === 0) return 50; // No cross-reviews → neutral
+
+  const agrees = crossReviews.filter((r) => r.verdict === 'agree').length;
+  const disagrees = crossReviews.filter((r) => r.verdict === 'disagree').length;
   const total = agrees + disagrees;
 
   if (total === 0) return 50; // All abstained → neutral
@@ -231,8 +233,11 @@ export async function runDebate(
   for (const review of reviews) {
     for (let i = 0; i < review.issues.length; i++) {
       const issue = review.issues[i];
+      // Match cross-reviews: try both 0-based and 1-based issueIndex
       const crossReviews = allCrossReviews.filter(
-        (cr) => cr.targetAgent === review.agent && cr.issueIndex === i,
+        (cr) =>
+          cr.targetAgent === review.agent &&
+          (cr.issueIndex === i || cr.issueIndex === i + 1),
       );
 
       enrichedIssues.push({
