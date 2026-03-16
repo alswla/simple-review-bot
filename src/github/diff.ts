@@ -53,6 +53,11 @@ export function filterDiff(
   const files = parseDiff(rawDiff);
 
   const filtered = files.filter((file) => {
+    // Skip files with no additions (deletion-only / removed files)
+    if (file.additions.length === 0) {
+      return false;
+    }
+
     // Check file patterns
     for (const pattern of ignoreFiles) {
       if (minimatch(file.filename, pattern)) {
