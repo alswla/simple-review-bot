@@ -251,11 +251,9 @@ async function run(): Promise<void> {
     const inlineComments = buildInlineComments(enrichedIssues, reviews);
     if (inlineComments.length > 0) {
       const reviewEvent =
-        votingSummary.verdict === "approved"
-          ? ("COMMENT" as const)
-          : votingSummary.verdict === "changes-requested"
-            ? ("REQUEST_CHANGES" as const)
-            : ("COMMENT" as const);
+        votingSummary.verdict === 'approved'
+          ? ('APPROVE' as const)
+          : ('COMMENT' as const);
 
       await ghClient.createInlineReview(
         prNumber,
