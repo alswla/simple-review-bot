@@ -42,22 +42,32 @@ Automatically adjusts agent weights based on PR file types:
 </tr>
 </table>
 
-### 💬 Cross-Review Debate
+### 💬 Cross-Review Debate (Enabled by Default)
 
 Agents cross-validate each other's findings:
 
-1. **Round 1** — Independent review (4 agents in parallel)
+1. **Round 1** — Independent review (4 agents in parallel, max 3 issues per agent)
 2. **Round 2** — Cross-review (each agent evaluates others' issues with agree/disagree/abstain)
 
-→ Per-issue **confidence score** (reduces false positives)
+→ Per-issue **confidence score** — issues below 50% confidence are filtered out automatically
 
 ### 📝 PR Summary
 
-Automatically generates a concise summary of PR changes using LLM.
+Automatically generates a concise summary of PR changes using LLM. Respects the `output.language` setting. Also generated for deletion-only PRs.
 
 ### 📌 Inline Review Comments
 
-High-confidence issues are posted as **inline comments directly on the code** (not just a single big comment). After debate, only issues with confidence ≥ 50% get inline comments.
+High-confidence issues are posted as **inline comments directly on the code** (not just a single big comment). The bot always uses `COMMENT` review event (never `REQUEST_CHANGES`), so it won't block your PR — human reviewers decide to approve or reject.
+
+### 🎯 Strict Severity Criteria
+
+Agents follow strict severity guidelines:
+
+- 🔴 **critical** — Immediately exploitable (injection, auth bypass) or will cause bugs/crashes
+- 🟡 **warning** — Needs attention but not immediately dangerous (missing validation, memory leak potential)
+- 💡 **info** — Minor suggestion or best practice
+
+Agents do NOT suggest architecture changes (e.g., "use Redis") — they only review the code as written.
 
 ### 🏷️ Auto Labels
 
@@ -73,7 +83,7 @@ Type `/review` in a PR comment to re-trigger the review.
 
 ### 🚫 Hard Cut
 
-Automatically skips review for oversized PRs (default: 300 files or 10,000 lines).
+Automatically skips review for oversized PRs (default: 300 files or 10,000 lines). Deletion-only files are also skipped (no point reviewing removed code).
 
 ---
 
@@ -184,10 +194,10 @@ voting:
   required_approvals: 2
   conditional_weight: 0.5
 
-# Cross-review debate
+# Cross-review debate (enabled by default)
 debate:
-  enabled: true
-  trigger: on-critical # always | on-critical | on-disagreement
+  enabled: true          # default: true
+  trigger: always        # always | on-critical | on-disagreement (default: always)
 
 # Auto weight detection
 weights:
@@ -267,7 +277,7 @@ Example `common.md`:
 <tr>
   <td>🎨 UX</td><td>❌ reject</td><td>×0.5</td><td>1 critical</td><td>0.0</td>
 </tr>
-<tr><td colspan="5"><code>▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░</code> 80% confidence</td></tr>
+<tr><td colspan="5"><code>▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░</code> 80% approval score</td></tr>
 </table>
 
 **📋 Action Items**
