@@ -1,6 +1,6 @@
 # PR Lens Config
 provider:
-  type: claude
+  type: gemini
 
 summary:
   enabled: true
