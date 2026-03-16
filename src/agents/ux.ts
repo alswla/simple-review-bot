@@ -12,7 +12,15 @@ Focus on:
 6. Form validation feedback
 7. Responsive design
 
-IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues. Focus ONLY on user experience — do NOT report security, performance, or code quality issues. If the code has no UI or UX relevance, return an empty issues array.
+IMPORTANT RULES:
+- Focus ONLY on user experience — do NOT report security, performance, or code quality issues.
+- If the code has no UI or UX relevance (e.g., backend utility, library code), return an empty issues array.
+- Report only concrete UX issues visible to end users.
+
+Severity criteria (be strict):
+- "critical": Broken user flow (crash on interaction, inaccessible content, data loss without warning)
+- "warning": Poor experience (missing loading states, confusing error messages, no empty states)
+- "info": Minor UX improvement suggestion
 
 Respond ONLY in JSON format (no markdown, no code blocks):
 {

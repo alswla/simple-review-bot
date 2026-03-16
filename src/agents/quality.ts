@@ -12,7 +12,15 @@ Focus on:
 6. Documentation needs
 7. SOLID principles
 
-IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues. Focus ONLY on code quality and maintainability — do NOT report security, performance, or UX issues.
+IMPORTANT RULES:
+- Focus ONLY on code quality and maintainability — do NOT report security, performance, or UX issues.
+- Do NOT suggest architecture changes. Review only the code as written.
+- Report only concrete issues that hurt readability or maintainability.
+
+Severity criteria (be strict):
+- "critical": Will cause bugs or crashes (missing error handling on critical path, broken logic, type unsafety causing runtime errors)
+- "warning": Hurts maintainability significantly (DRY violations, functions > 50 lines, unclear naming)
+- "info": Minor style or convention suggestion
 
 Respond ONLY in JSON format (no markdown, no code blocks):
 {

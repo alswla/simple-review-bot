@@ -64696,7 +64696,15 @@ Focus on:
 6. Memory leak potential
 7. Blocking operations in async context
 
-IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues. Focus ONLY on performance — do NOT report security, code quality, or UX issues.
+IMPORTANT RULES:
+- Focus ONLY on performance — do NOT report security, code quality, or UX issues.
+- Do NOT suggest architecture changes (e.g., "use Redis", "add distributed locking"). Review only the code as written.
+- Report only concrete, measurable performance issues. No speculative concerns.
+
+Severity criteria (be strict):
+- "critical": Causes severe degradation at scale (O(n²) on large data, N+1 queries, infinite loops, memory leaks with no cleanup)
+- "warning": Suboptimal but not catastrophic (missing pagination, sequential where parallel is possible)
+- "info": Minor optimization opportunity
 
 Respond ONLY in JSON format (no markdown, no code blocks):
 {
@@ -64783,7 +64791,15 @@ Focus on:
 6. Documentation needs
 7. SOLID principles
 
-IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues. Focus ONLY on code quality and maintainability — do NOT report security, performance, or UX issues.
+IMPORTANT RULES:
+- Focus ONLY on code quality and maintainability — do NOT report security, performance, or UX issues.
+- Do NOT suggest architecture changes. Review only the code as written.
+- Report only concrete issues that hurt readability or maintainability.
+
+Severity criteria (be strict):
+- "critical": Will cause bugs or crashes (missing error handling on critical path, broken logic, type unsafety causing runtime errors)
+- "warning": Hurts maintainability significantly (DRY violations, functions > 50 lines, unclear naming)
+- "info": Minor style or convention suggestion
 
 Respond ONLY in JSON format (no markdown, no code blocks):
 {
@@ -64868,7 +64884,15 @@ Focus on:
 5. Input validation gaps
 6. Unsafe functions (eval, exec, etc.)
 
-IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues. Focus ONLY on security — do NOT report performance, code quality, or UX issues.
+IMPORTANT RULES:
+- Focus ONLY on security — do NOT report performance, code quality, or UX issues.
+- Do NOT suggest architecture changes (e.g., "use Redis", "add distributed locking"). Review only the code as written.
+- Report only concrete, actionable issues in the current code. No speculative or theoretical risks.
+
+Severity criteria (be strict):
+- "critical": Immediately exploitable vulnerability (SQL injection, auth bypass, data exposure, RCE)
+- "warning": Potential risk that needs attention but not immediately exploitable (missing input validation, weak config)
+- "info": Minor suggestion or best practice reminder
 
 Respond ONLY in JSON format (no markdown, no code blocks):
 {
@@ -64954,7 +64978,15 @@ Focus on:
 6. Form validation feedback
 7. Responsive design
 
-IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues. Focus ONLY on user experience — do NOT report security, performance, or code quality issues. If the code has no UI or UX relevance, return an empty issues array.
+IMPORTANT RULES:
+- Focus ONLY on user experience — do NOT report security, performance, or code quality issues.
+- If the code has no UI or UX relevance (e.g., backend utility, library code), return an empty issues array.
+- Report only concrete UX issues visible to end users.
+
+Severity criteria (be strict):
+- "critical": Broken user flow (crash on interaction, inaccessible content, data loss without warning)
+- "warning": Poor experience (missing loading states, confusing error messages, no empty states)
+- "info": Minor UX improvement suggestion
 
 Respond ONLY in JSON format (no markdown, no code blocks):
 {

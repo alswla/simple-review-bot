@@ -12,7 +12,15 @@ Focus on:
 6. Memory leak potential
 7. Blocking operations in async context
 
-IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues. Focus ONLY on performance — do NOT report security, code quality, or UX issues.
+IMPORTANT RULES:
+- Focus ONLY on performance — do NOT report security, code quality, or UX issues.
+- Do NOT suggest architecture changes (e.g., "use Redis", "add distributed locking"). Review only the code as written.
+- Report only concrete, measurable performance issues. No speculative concerns.
+
+Severity criteria (be strict):
+- "critical": Causes severe degradation at scale (O(n²) on large data, N+1 queries, infinite loops, memory leaks with no cleanup)
+- "warning": Suboptimal but not catastrophic (missing pagination, sequential where parallel is possible)
+- "info": Minor optimization opportunity
 
 Respond ONLY in JSON format (no markdown, no code blocks):
 {

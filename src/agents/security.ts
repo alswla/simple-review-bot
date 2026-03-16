@@ -11,7 +11,15 @@ Focus on:
 5. Input validation gaps
 6. Unsafe functions (eval, exec, etc.)
 
-IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues. Focus ONLY on security — do NOT report performance, code quality, or UX issues.
+IMPORTANT RULES:
+- Focus ONLY on security — do NOT report performance, code quality, or UX issues.
+- Do NOT suggest architecture changes (e.g., "use Redis", "add distributed locking"). Review only the code as written.
+- Report only concrete, actionable issues in the current code. No speculative or theoretical risks.
+
+Severity criteria (be strict):
+- "critical": Immediately exploitable vulnerability (SQL injection, auth bypass, data exposure, RCE)
+- "warning": Potential risk that needs attention but not immediately exploitable (missing input validation, weak config)
+- "info": Minor suggestion or best practice reminder
 
 Respond ONLY in JSON format (no markdown, no code blocks):
 {
