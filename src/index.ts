@@ -8,15 +8,16 @@ import {
   UXAgent,
   Agent,
 } from "./agents";
-import { GitHubClient } from "./github/client";
-import { filterDiff } from "./github/diff";
-import { formatComment, buildInlineComments } from "./github/comment";
+import { GitHubClient } from './github/client';
+import { filterDiff, parseDiff } from './github/diff';
+import { formatComment, buildInlineComments } from './github/comment';
 import { loadConfig, normalizeAgentConfig } from "./utils/config";
 import { loadGuidelines, buildPrompt } from "./utils/guidelines";
 import { castVote, countVotes, AgentVote } from "./review/voter";
 import { determineWeights, getAgentWeight } from "./review/weigher";
-import { runDebate, EnrichedIssue } from "./review/debate";
-import * as logger from "./utils/logger";
+import { runDebate, EnrichedIssue } from './review/debate';
+import { generatePRSummary } from './review/summary';
+import * as logger from './utils/logger';
 
 async function run(): Promise<void> {
   try {
@@ -97,15 +98,39 @@ async function run(): Promise<void> {
           "\n\n... (diff truncated due to size)"
         : diff;
 
-    // 8. Tiered model selection
-    let tieredModel: string | undefined;
-    if (config.tiered_model?.enabled) {
-      const changedLines = countChangedLines(rawDiff);
-      tieredModel = selectModel(providerType, changedLines);
-      logger.info(`Tiered model: ${changedLines} lines → ${tieredModel}`);
+    // 8. Hard Cut — skip oversized PRs
+    const files = parseDiff(rawDiff);
+    const totalChangedLines = countChangedLines(rawDiff);
+
+    if (config.hard_cut?.enabled !== false) {
+      const maxFiles = config.hard_cut?.max_changed_files ?? 300;
+      const maxLines = config.hard_cut?.max_changed_lines ?? 10000;
+
+      if (files.length > maxFiles || totalChangedLines > maxLines) {
+        const msg = `⚠️ PR too large (${files.length} files, ${totalChangedLines} lines). Skipping review. (limit: ${maxFiles} files, ${maxLines} lines)`;
+        logger.warn(msg);
+        await ghClient.postComment(
+          prNumber,
+          `<!-- simple-review-bot -->\n## 🔍 simple-review-bot Review\n\n${msg}\n\n_Adjust \`hard_cut\` in \`.github/pr-lens.yml\` to change limits._`,
+        );
+        return;
+      }
     }
 
-    // 9. Determine agent weights based on file types
+    // 9. Generate PR Summary (in parallel with setup)
+    let prSummary: string | undefined;
+    if (config.summary?.enabled !== false) {
+      prSummary = await generatePRSummary(truncatedDiff, files, provider);
+    }
+
+    // 10. Tiered model selection
+    let tieredModel: string | undefined;
+    if (config.tiered_model?.enabled) {
+      tieredModel = selectModel(providerType, totalChangedLines);
+      logger.info(`Tiered model: ${totalChangedLines} lines → ${tieredModel}`);
+    }
+
+    // 11. Determine agent weights based on file types
     const weights = determineWeights(
       rawDiff,
       config.weights?.auto_detect !== false
@@ -116,7 +141,7 @@ async function run(): Promise<void> {
       `Weights: Security=${weights.security} Performance=${weights.performance} Quality=${weights.quality} UX=${weights.ux}`,
     );
 
-    // 10. Initialize agents with custom guidelines
+    // 12. Initialize agents with custom guidelines
     const allAgentEntries = [
       { key: "security", agent: new SecurityAgent() as Agent },
       { key: "performance", agent: new PerformanceAgent() as Agent },
@@ -145,7 +170,7 @@ async function run(): Promise<void> {
       return;
     }
 
-    // 11. Run reviews in parallel (Round 1)
+    // 13. Run reviews in parallel (Round 1)
     logger.info(`🔍 Running reviews with ${agents.length} agents...`);
     const reviews = await Promise.all(
       agents.map(({ agent, model: agentModel }) => {
@@ -157,7 +182,7 @@ async function run(): Promise<void> {
       }),
     );
 
-    // 12. Cast votes based on review results
+    // 14. Cast votes based on review results
     const votes: AgentVote[] = reviews.map((review) =>
       castVote(
         review.agent,
@@ -167,7 +192,7 @@ async function run(): Promise<void> {
       ),
     );
 
-    // 13. Run debate (Round 2 — cross-review) if enabled
+    // 15. Run debate (Round 2 — cross-review) if enabled
     let enrichedIssues: EnrichedIssue[] | undefined;
     const debateConfig = config.debate || {};
 
@@ -178,7 +203,7 @@ async function run(): Promise<void> {
       });
     }
 
-    // 14. Count votes with weighted scoring
+    // 16. Count votes with weighted scoring
     const votingSummary = countVotes(votes, {
       requiredApprovals: config.voting?.required_approvals ?? 2,
       conditionalWeight: config.voting?.conditional_weight ?? 0.5,
@@ -188,16 +213,17 @@ async function run(): Promise<void> {
       `Vote result: ${votingSummary.verdict} (${votingSummary.totalWeightedScore.toFixed(1)}/${votingSummary.maxPossibleScore.toFixed(1)})`,
     );
 
-    // 15. Format and post dashboard comment
+    // 17. Format and post dashboard comment
     const comment = formatComment(
       reviews,
       votes,
       votingSummary,
       enrichedIssues,
+      prSummary,
     );
     await ghClient.postComment(prNumber, comment);
 
-    // 16. Post inline review comments (high-confidence issues only)
+    // 18. Post inline review comments (high-confidence issues only)
     const inlineComments = buildInlineComments(enrichedIssues, reviews);
     if (inlineComments.length > 0) {
       const reviewEvent =
@@ -215,7 +241,7 @@ async function run(): Promise<void> {
       );
     }
 
-    // 17. Apply label if enabled
+    // 19. Apply label if enabled
     if (config.labels?.enabled) {
       const labelMap: Record<string, string> = {
         approved: config.labels.approved || "review:approved",

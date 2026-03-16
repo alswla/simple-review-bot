@@ -131,11 +131,25 @@ export function formatComment(
   votes?: AgentVote[],
   votingSummary?: VotingSummary,
   enrichedIssues?: EnrichedIssue[],
+  prSummary?: string,
 ): string {
   const lines: string[] = [
     "<!-- simple-review-bot -->",
     "## 🔍 simple-review-bot Review\n",
   ];
+
+  // PR Summary section
+  if (prSummary) {
+    lines.push(
+      "<details>",
+      "<summary>📝 <b>PR Summary</b></summary>",
+      "",
+      prSummary,
+      "",
+      "</details>",
+      "",
+    );
+  }
 
   // Dashboard section (if voting is available)
   if (votes && votingSummary) {
