@@ -121,7 +121,7 @@ async function run(): Promise<void> {
     // 9. Generate PR Summary (in parallel with setup)
     let prSummary: string | undefined;
     if (config.summary?.enabled !== false) {
-      prSummary = await generatePRSummary(truncatedDiff, files, provider);
+      prSummary = await generatePRSummary(truncatedDiff, files, provider, config.output?.language);
     }
 
     // 10. Tiered model selection
