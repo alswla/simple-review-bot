@@ -65508,6 +65508,10 @@ function parseDiff(rawDiff) {
 function filterDiff(rawDiff, ignoreFiles = [], ignorePaths = []) {
     const files = parseDiff(rawDiff);
     const filtered = files.filter((file) => {
+        // Skip files with no additions (deletion-only / removed files)
+        if (file.additions.length === 0) {
+            return false;
+        }
         // Check file patterns
         for (const pattern of ignoreFiles) {
             if ((0, minimatch_1.minimatch)(file.filename, pattern)) {
