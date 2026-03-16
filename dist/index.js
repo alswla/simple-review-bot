@@ -65670,7 +65670,20 @@ async function run() {
         // 6. Filter diff based on ignore config
         const diff = (0, diff_1.filterDiff)(rawDiff, config.ignore?.files, config.ignore?.paths);
         if (!diff || diff.trim().length === 0) {
-            logger.info("All changed files are ignored. Skipping review.");
+            logger.info('No reviewable changes (deletion-only or all ignored). Posting summary only.');
+            // Still generate PR summary from raw diff
+            const files = (0, diff_1.parseDiff)(rawDiff);
+            let prSummary;
+            if (config.summary?.enabled !== false) {
+                prSummary = await (0, summary_1.generatePRSummary)(rawDiff, files, provider, config.output?.language);
+            }
+            // Post a comment with just the summary
+            const lines = ['<!-- simple-review-bot -->', '## 🔍 simple-review-bot Review\n'];
+            if (prSummary) {
+                lines.push('<details>', '<summary>📝 <b>PR Summary</b></summary>', '', prSummary, '', '</details>', '');
+            }
+            lines.push('_No reviewable code changes found (deletion-only or ignored files)._ ✨');
+            await ghClient.postComment(prNumber, lines.join('\n'));
             return;
         }
         // 7. Truncate diff if too large (LLM context limit)
