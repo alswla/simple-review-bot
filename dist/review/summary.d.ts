@@ -3,5 +3,5 @@ import { DiffFile } from '../github/diff';
 /**
  * Generate a PR summary using LLM from the diff content.
  */
-export declare function generatePRSummary(diff: string, files: DiffFile[], provider: LLMProvider): Promise<string>;
+export declare function generatePRSummary(diff: string, files: DiffFile[], provider: LLMProvider, language?: string): Promise<string>;
 //# sourceMappingURL=summary.d.ts.map

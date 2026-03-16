@@ -184,7 +184,7 @@ export function formatComment(
     lines.push(formatVoteTable(votes));
     lines.push("");
     lines.push(
-      `${progressBar(votingSummary.confidencePercent)} ${votingSummary.confidencePercent}% confidence`,
+      `${progressBar(votingSummary.confidencePercent)} ${votingSummary.confidencePercent}% approval score`,
     );
     lines.push("");
   }
