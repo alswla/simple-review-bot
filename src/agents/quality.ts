@@ -12,7 +12,7 @@ Focus on:
 6. Documentation needs
 7. SOLID principles
 
-IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues.
+IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues. Focus ONLY on code quality and maintainability — do NOT report security, performance, or UX issues.
 
 Respond ONLY in JSON format (no markdown, no code blocks):
 {

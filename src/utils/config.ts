@@ -95,8 +95,8 @@ const DEFAULT_CONFIG: PRLensConfig = {
     conditional_weight: 0.5,
   },
   debate: {
-    enabled: false,
-    trigger: "on-critical",
+    enabled: true,
+    trigger: 'always',
   },
   weights: {
     auto_detect: true,

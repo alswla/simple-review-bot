@@ -11,7 +11,7 @@ Focus on:
 5. Input validation gaps
 6. Unsafe functions (eval, exec, etc.)
 
-IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues.
+IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues. Focus ONLY on security — do NOT report performance, code quality, or UX issues.
 
 Respond ONLY in JSON format (no markdown, no code blocks):
 {

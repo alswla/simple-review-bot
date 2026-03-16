@@ -64581,24 +64581,31 @@ class BaseAgent {
     }
 }
 exports.BaseAgent = BaseAgent;
+const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 };
+const MAX_ISSUES_PER_AGENT = 3;
 function parseAgentResponse(raw, agentName, emoji) {
     try {
         // Try to extract JSON from markdown code blocks if present
         const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
         const jsonStr = jsonMatch ? jsonMatch[1].trim() : raw.trim();
         const parsed = JSON.parse(jsonStr);
+        const allIssues = (parsed.issues || []).map((issue) => ({
+            file: issue.file || 'unknown',
+            line: issue.line,
+            severity: issue.severity || 'info',
+            type: issue.type || issue.complexity || 'general',
+            issue: issue.issue || 'No description',
+            suggestion: issue.suggestion || 'No suggestion',
+        }));
+        // Sort by severity (critical first) and cap at MAX_ISSUES_PER_AGENT
+        const issues = allIssues
+            .sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 2) - (SEVERITY_ORDER[b.severity] ?? 2))
+            .slice(0, MAX_ISSUES_PER_AGENT);
         return {
             agent: agentName,
             emoji,
-            summary: parsed.summary || "No summary provided.",
-            issues: (parsed.issues || []).map((issue) => ({
-                file: issue.file || "unknown",
-                line: issue.line,
-                severity: issue.severity || "info",
-                type: issue.type || issue.complexity || "general",
-                issue: issue.issue || "No description",
-                suggestion: issue.suggestion || "No suggestion",
-            })),
+            summary: parsed.summary || 'No summary provided.',
+            issues,
         };
     }
     catch {
@@ -64689,7 +64696,7 @@ Focus on:
 6. Memory leak potential
 7. Blocking operations in async context
 
-IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues.
+IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues. Focus ONLY on performance — do NOT report security, code quality, or UX issues.
 
 Respond ONLY in JSON format (no markdown, no code blocks):
 {
@@ -64776,7 +64783,7 @@ Focus on:
 6. Documentation needs
 7. SOLID principles
 
-IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues.
+IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues. Focus ONLY on code quality and maintainability — do NOT report security, performance, or UX issues.
 
 Respond ONLY in JSON format (no markdown, no code blocks):
 {
@@ -64861,7 +64868,7 @@ Focus on:
 5. Input validation gaps
 6. Unsafe functions (eval, exec, etc.)
 
-IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues.
+IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues. Focus ONLY on security — do NOT report performance, code quality, or UX issues.
 
 Respond ONLY in JSON format (no markdown, no code blocks):
 {
@@ -64947,7 +64954,7 @@ Focus on:
 6. Form validation feedback
 7. Responsive design
 
-IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues.
+IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues. Focus ONLY on user experience — do NOT report security, performance, or code quality issues. If the code has no UI or UX relevance, return an empty issues array.
 
 Respond ONLY in JSON format (no markdown, no code blocks):
 {
@@ -65341,11 +65348,19 @@ function formatComment(reviews, votes, votingSummary, enrichedIssues, prSummary)
         lines.push(`${progressBar(votingSummary.confidencePercent)} ${votingSummary.confidencePercent}% confidence`);
         lines.push("");
     }
-    // Issues section
+    // Issues section (filter low-confidence issues after debate)
     if (enrichedIssues && enrichedIssues.length > 0) {
+        const MIN_CONFIDENCE = 50;
+        const highConfidence = enrichedIssues.filter((i) => i.confidence >= MIN_CONFIDENCE);
+        const filtered = enrichedIssues.length - highConfidence.length;
         lines.push("---");
-        lines.push(`### 🔍 Issues (${enrichedIssues.length} found)\n`);
-        lines.push(formatEnrichedIssues(enrichedIssues));
+        if (filtered > 0) {
+            lines.push(`### 🔍 Issues (${highConfidence.length} confirmed, ${filtered} filtered out by cross-review)\n`);
+        }
+        else {
+            lines.push(`### 🔍 Issues (${highConfidence.length} found)\n`);
+        }
+        lines.push(formatEnrichedIssues(highConfidence));
         // Action items
         const actionItems = formatActionItems(enrichedIssues);
         if (actionItems) {
@@ -66704,8 +66719,8 @@ const DEFAULT_CONFIG = {
         conditional_weight: 0.5,
     },
     debate: {
-        enabled: false,
-        trigger: "on-critical",
+        enabled: true,
+        trigger: 'always',
     },
     weights: {
         auto_detect: true,

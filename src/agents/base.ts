@@ -63,6 +63,9 @@ export abstract class BaseAgent implements Agent {
   }
 }
 
+const SEVERITY_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+const MAX_ISSUES_PER_AGENT = 3;
+
 export function parseAgentResponse(
   raw: string,
   agentName: string,
@@ -74,19 +77,28 @@ export function parseAgentResponse(
     const jsonStr = jsonMatch ? jsonMatch[1].trim() : raw.trim();
     const parsed = JSON.parse(jsonStr);
 
+    const allIssues: ReviewIssue[] = (parsed.issues || []).map(
+      (issue: Record<string, unknown>) => ({
+        file: (issue.file as string) || 'unknown',
+        line: issue.line as number | undefined,
+        severity: (issue.severity as ReviewIssue['severity']) || 'info',
+        type:
+          (issue.type as string) || (issue.complexity as string) || 'general',
+        issue: (issue.issue as string) || 'No description',
+        suggestion: (issue.suggestion as string) || 'No suggestion',
+      }),
+    );
+
+    // Sort by severity (critical first) and cap at MAX_ISSUES_PER_AGENT
+    const issues = allIssues
+      .sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 2) - (SEVERITY_ORDER[b.severity] ?? 2))
+      .slice(0, MAX_ISSUES_PER_AGENT);
+
     return {
       agent: agentName,
       emoji,
-      summary: parsed.summary || "No summary provided.",
-      issues: (parsed.issues || []).map((issue: Record<string, unknown>) => ({
-        file: (issue.file as string) || "unknown",
-        line: issue.line as number | undefined,
-        severity: (issue.severity as ReviewIssue["severity"]) || "info",
-        type:
-          (issue.type as string) || (issue.complexity as string) || "general",
-        issue: (issue.issue as string) || "No description",
-        suggestion: (issue.suggestion as string) || "No suggestion",
-      })),
+      summary: parsed.summary || 'No summary provided.',
+      issues,
     };
   } catch {
     // If JSON parsing fails, return a fallback review

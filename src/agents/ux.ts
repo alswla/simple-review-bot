@@ -12,7 +12,7 @@ Focus on:
 6. Form validation feedback
 7. Responsive design
 
-IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues.
+IMPORTANT: Report only the top 5 most impactful issues. Prioritize critical > warning > info. Do NOT report trivial or speculative issues. Focus ONLY on user experience — do NOT report security, performance, or code quality issues. If the code has no UI or UX relevance, return an empty issues array.
 
 Respond ONLY in JSON format (no markdown, no code blocks):
 {

@@ -189,11 +189,23 @@ export function formatComment(
     lines.push("");
   }
 
-  // Issues section
+  // Issues section (filter low-confidence issues after debate)
   if (enrichedIssues && enrichedIssues.length > 0) {
+    const MIN_CONFIDENCE = 50;
+    const highConfidence = enrichedIssues.filter(
+      (i) => i.confidence >= MIN_CONFIDENCE,
+    );
+    const filtered = enrichedIssues.length - highConfidence.length;
+
     lines.push("---");
-    lines.push(`### 🔍 Issues (${enrichedIssues.length} found)\n`);
-    lines.push(formatEnrichedIssues(enrichedIssues));
+    if (filtered > 0) {
+      lines.push(
+        `### 🔍 Issues (${highConfidence.length} confirmed, ${filtered} filtered out by cross-review)\n`,
+      );
+    } else {
+      lines.push(`### 🔍 Issues (${highConfidence.length} found)\n`);
+    }
+    lines.push(formatEnrichedIssues(highConfidence));
 
     // Action items
     const actionItems = formatActionItems(enrichedIssues);
