@@ -203,6 +203,7 @@ labels:
 # Output style
 output:
   style: detailed # detailed | summary
+  language: ko    # en, ko, ja, zh, es, fr, de, pt
 
 # Ignore patterns
 ignore:

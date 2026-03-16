@@ -1,13 +1,6 @@
-# PR Lens Config for testing
+# PR Lens Config
 provider:
-  type: gemini
-
-debate:
-  enabled: true
-  trigger: on-critical
-
-labels:
-  enabled: true
+  type: claude
 
 summary:
   enabled: true
