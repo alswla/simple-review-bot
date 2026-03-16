@@ -25,6 +25,14 @@ export interface PRLensConfig {
   tiered_model?: {
     enabled?: boolean;
   };
+  hard_cut?: {
+    enabled?: boolean;
+    max_changed_files?: number;
+    max_changed_lines?: number;
+  };
+  summary?: {
+    enabled?: boolean;
+  };
   voting?: {
     required_approvals?: number;
     conditional_weight?: number;
@@ -70,6 +78,14 @@ const DEFAULT_CONFIG: PRLensConfig = {
   },
   tiered_model: {
     enabled: false,
+  },
+  hard_cut: {
+    enabled: true,
+    max_changed_files: 300,
+    max_changed_lines: 10000,
+  },
+  summary: {
+    enabled: true,
   },
   voting: {
     required_approvals: 2,
@@ -134,6 +150,14 @@ export function loadConfig(configPath?: string): PRLensConfig {
         tiered_model: {
           ...DEFAULT_CONFIG.tiered_model,
           ...userConfig.tiered_model,
+        },
+        hard_cut: {
+          ...DEFAULT_CONFIG.hard_cut,
+          ...userConfig.hard_cut,
+        },
+        summary: {
+          ...DEFAULT_CONFIG.summary,
+          ...userConfig.summary,
         },
         voting: {
           ...DEFAULT_CONFIG.voting,
